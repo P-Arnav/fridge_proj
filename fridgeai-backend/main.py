@@ -27,7 +27,6 @@ async def lifespan(app: FastAPI):
     await init_db()
     await recover_on_startup()
     yield
-    # asyncio cancels all running tasks on shutdown automatically
 
 
 app = FastAPI(
