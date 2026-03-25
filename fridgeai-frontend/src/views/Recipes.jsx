@@ -1,28 +1,31 @@
 import { useEffect, useState } from 'react'
 import { C } from '../constants.js'
 import { api } from '../api.js'
+import RecipeUploadModal from '../components/RecipeUploadModal.jsx'
 
 export default function Recipes() {
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showUpload, setShowUpload] = useState(false)
+
+  const loadRecipes = async () => {
+    try {
+      setLoading(true)
+      const data = await api.getRecipes()
+      if (data && !data.error) {
+        setRecipes(data)
+      } else {
+        setError(data.error || 'Failed to fetch recipes')
+      }
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function loadRecipes() {
-      try {
-        setLoading(true)
-        const data = await api.getRecipes()
-        if (data && !data.error) {
-          setRecipes(data)
-        } else {
-          setError(data.error || 'Failed to fetch recipes')
-        }
-      } catch (e) {
-        setError(e.message)
-      } finally {
-        setLoading(false)
-      }
-    }
     loadRecipes()
   }, [])
 
@@ -56,11 +59,16 @@ export default function Recipes() {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 700, color: C.text, margin: 0 }}>Smart Recipes</h2>
-        <p style={{ color: C.muted, fontSize: 15, marginTop: 6, margin: 0 }}>
-          Delicious meals based on what's currently in your FridgeAI inventory.
-        </p>
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <h2 style={{ fontSize: 26, fontWeight: 700, color: C.text, margin: 0, letterSpacing: '-0.02em' }}>Smart Recipes</h2>
+          <p style={{ color: C.muted, fontSize: 15, marginTop: 6, margin: 0 }}>
+            Delicious meals based on what's currently in your FridgeAI inventory.
+          </p>
+        </div>
+        <button className="glass-button-primary" onClick={() => setShowUpload(true)} style={{ padding: '10px 20px', fontSize: 14 }}>
+          + Upload Recipe
+        </button>
       </div>
 
       <div style={{
@@ -85,13 +93,10 @@ function RecipeCard({ recipe }) {
   const matchPercent = totalCount > 0 ? Math.round((usedCount / totalCount) * 100) : 0
 
   return (
-    <div style={{
-      background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16,
-      overflow: 'hidden', display: 'flex', flexDirection: 'column',
-      transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'pointer',
-      ':hover': { transform: 'translateY(-4px)', boxShadow: '0 12px 24px rgba(0,0,0,0.1)' }
+    <div className="glass-card" style={{
+      display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'pointer'
     }}>
-      <div style={{ position: 'relative', height: 180, background: C.surface2 }}>
+      <div style={{ position: 'relative', height: 180, background: 'rgba(0,0,0,0.3)', borderBottom: `1px solid rgba(255,255,255,0.05)` }}>
         {recipe.image && (
           <img src={recipe.image} alt={recipe.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         )}
@@ -143,13 +148,11 @@ function RecipeCard({ recipe }) {
           )}
         </div>
         
-        <button style={{
-          marginTop: 20, width: '100%', padding: '10px 0', background: 'transparent',
-          color: C.teal, border: `1px solid ${C.teal}`, borderRadius: 8,
-          fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Syne', sans-serif",
-          transition: 'all 0.2s'
-        }} onMouseOver={e => { e.currentTarget.style.background = C.teal; e.currentTarget.style.color = C.bg }}
-           onMouseOut={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.teal }}>
+        
+        <button className="glass-button" style={{
+          marginTop: 20, width: '100%', padding: '10px 0',
+          color: C.teal, fontSize: 14, fontWeight: 700
+        }}>
           View Recipe
         </button>
       </div>

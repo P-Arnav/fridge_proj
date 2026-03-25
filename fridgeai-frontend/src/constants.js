@@ -1,13 +1,14 @@
 export const C = {
-  bg:       '#070d1a',
-  surface:  '#0c1628',
-  surface2: '#101e33',
-  border:   '#1a2e4a',
-  border2:  '#243d5c',
+  bg:       'transparent', // Let gradient handle this
+  surface:  'rgba(20, 30, 48, 0.4)', // Glass surface
+  surface2: 'rgba(255, 255, 255, 0.03)',
+  border:   'rgba(255, 255, 255, 0.08)',
+  border2:  'rgba(255, 255, 255, 0.12)',
   teal:     '#00d4aa',
   blue:     '#3b9eff',
-  text:     '#e8f0fe',
-  muted:    '#4a6080',
+  accent:   '#8854d0',
+  text:     '#f0f4f8',
+  muted:    '#829ab1',
   critical: '#ff4d6d',
   warn:     '#fbbf24',
   safe:     '#34d399',

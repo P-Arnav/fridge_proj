@@ -10,19 +10,16 @@ export default function ItemCard({ item }) {
   const rslLow = item.RSL != null && item.RSL < 1
 
   const cardStyle = {
-    background: C.surface,
-    border: `1px solid ${item.P_spoil > 0.80 ? C.critical + '55' : C.border}`,
-    borderRadius: 10,
-    padding: '14px 16px',
+    borderColor: item.P_spoil > 0.80 ? C.critical + '88' : 'rgba(255,255,255,0.05)',
+    padding: '16px',
     display: 'flex',
     flexDirection: 'column',
-    gap: 10,
+    gap: 12,
     position: 'relative',
-    transition: 'border-color 0.3s',
   }
 
   return (
-    <div style={cardStyle}>
+    <div className="glass-card" style={cardStyle}>
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div>

@@ -25,26 +25,14 @@ export default function Inventory({ items }) {
             return <Pill key={cat} label={cat} active={filter === cat} onClick={() => setFilter(cat)} count={n} />
           })}
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setShowReceipt(true)} style={{
-            background: 'none', color: '#8854d0', border: `1px solid #8854d0`, borderRadius: 8,
-            padding: '9px 16px', fontWeight: 600, cursor: 'pointer', fontSize: 13,
-            fontFamily: "'Syne', sans-serif",
-          }}>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button className="glass-button" onClick={() => setShowReceipt(true)} style={{ padding: '9px 16px', fontSize: 13, color: '#b388ff' }}>
             Upload Receipt
           </button>
-          <button onClick={() => setShowScan(true)} style={{
-            background: 'none', color: C.teal, border: `1px solid ${C.teal}`, borderRadius: 8,
-            padding: '9px 16px', fontWeight: 600, cursor: 'pointer', fontSize: 13,
-            fontFamily: "'Syne', sans-serif",
-          }}>
+          <button className="glass-button" onClick={() => setShowScan(true)} style={{ padding: '9px 16px', fontSize: 13, color: C.teal }}>
             Scan Fridge
           </button>
-          <button onClick={() => setShowModal(true)} style={{
-            background: C.teal, color: C.bg, border: 'none', borderRadius: 8,
-            padding: '9px 18px', fontWeight: 700, cursor: 'pointer', fontSize: 13,
-            fontFamily: "'Syne', sans-serif",
-          }}>
+          <button className="glass-button-primary" onClick={() => setShowModal(true)} style={{ padding: '9px 18px', fontSize: 13 }}>
             + Add Item
           </button>
         </div>
@@ -73,12 +61,14 @@ export default function Inventory({ items }) {
 function Pill({ label, active, onClick, count }) {
   return (
     <button onClick={onClick} style={{
-      background: active ? C.teal + '22' : 'none',
-      border: `1px solid ${active ? C.teal : C.border2}`,
-      color: active ? C.teal : C.muted,
-      borderRadius: 20, padding: '5px 13px', cursor: 'pointer', fontSize: 12,
-      fontFamily: "'Syne', sans-serif", fontWeight: active ? 600 : 400,
-      display: 'flex', alignItems: 'center', gap: 6,
+      background: active ? 'rgba(0, 212, 170, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+      border: `1px solid ${active ? 'rgba(0, 212, 170, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+      color: active ? C.teal : C.text,
+      backdropFilter: 'blur(4px)',
+      borderRadius: 20, padding: '6px 14px', cursor: 'pointer', fontSize: 13,
+      fontFamily: "'Inter', sans-serif", fontWeight: active ? 600 : 400,
+      display: 'flex', alignItems: 'center', gap: 8,
+      transition: 'all 0.2s'
     }}>
       {label}
       <span style={{

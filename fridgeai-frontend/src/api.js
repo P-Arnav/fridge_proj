@@ -55,6 +55,11 @@ export const api = {
   },
   
   getRecipes: () => fetch(`${BASE}/recipes`).then(r => r.json()),
+  
+  postRecipe: (fd) => fetch(`${BASE}/recipes`, {
+    method: 'POST',
+    body: fd, // FormData since it includes an image
+  }).then(r => { if (!r.ok) throw r; return r.json() }),
 }
 
 // WebSocket singleton with auto-reconnect

@@ -106,9 +106,11 @@ export default function App() {
       {/* Header */}
       <header style={{
         borderBottom: `1px solid ${C.border}`,
+        background: 'rgba(255,255,255,0.02)',
+        backdropFilter: 'blur(10px)',
         padding: '0 28px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        height: 56,
+        height: 64,
       }}>
         <div style={{
           fontWeight: 700, fontSize: 18, color: C.teal,
@@ -150,11 +152,13 @@ export default function App() {
 function NavTab({ label, active, onClick }) {
   return (
     <button onClick={onClick} style={{
-      background: active ? C.surface2 : 'none',
+      background: active ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
       border: active ? `1px solid ${C.border2}` : '1px solid transparent',
       color: active ? C.text : C.muted,
-      borderRadius: 8, padding: '6px 16px', cursor: 'pointer',
-      fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: active ? 600 : 400,
+      borderRadius: 8, padding: '8px 18px', cursor: 'pointer',
+      fontSize: 14, fontWeight: active ? 600 : 400,
+      fontFamily: "'Inter', sans-serif",
+      transition: 'all 0.2s',
     }}>
       {label}
     </button>
