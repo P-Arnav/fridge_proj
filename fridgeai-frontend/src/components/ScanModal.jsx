@@ -318,7 +318,7 @@ export default function ScanModal({ onClose }) {
 }
 
 const btnPrimary = {
-  background: C.teal, color: C.bg, border: 'none', borderRadius: 8,
+  background: C.teal, color: '#000', border: 'none', borderRadius: 8,
   padding: '9px 20px', fontWeight: 700, cursor: 'pointer', fontSize: 13,
   fontFamily: "'Syne', sans-serif",
 }
