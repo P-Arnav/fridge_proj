@@ -4,6 +4,7 @@ import { api, createWsClient } from './api.js'
 import Inventory from './views/Inventory.jsx'
 import Alerts from './views/Alerts.jsx'
 import Analytics from './views/Analytics.jsx'
+import Recipes from './views/Recipes.jsx'
 import AlertBanner from './components/AlertBanner.jsx'
 
 // ─── Reducer ────────────────────────────────────────────────────────────────
@@ -119,6 +120,7 @@ export default function App() {
         <nav style={{ display: 'flex', gap: 4 }}>
           {[
             { id: 'inventory', label: 'Inventory' },
+            { id: 'recipes',   label: 'Recipes' },
             { id: 'alerts',    label: `Alerts${alertCount ? ` (${alertCount})` : ''}` },
             { id: 'analytics', label: 'Analytics' },
           ].map(tab => (
@@ -137,6 +139,7 @@ export default function App() {
       {/* Body */}
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px' }}>
         {state.view === 'inventory' && <Inventory items={state.items} />}
+        {state.view === 'recipes'   && <Recipes />}
         {state.view === 'alerts'    && <Alerts alerts={state.alerts} />}
         {state.view === 'analytics' && <Analytics items={state.items} />}
       </main>

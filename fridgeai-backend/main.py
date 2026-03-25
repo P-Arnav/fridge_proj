@@ -12,6 +12,7 @@ from routers import alerts as alerts_router
 from routers import status as status_router
 from routers import lookup as lookup_router
 from routers import vision as vision_router
+from routers import ocr
 from routers import recipes
 from routers import grocery
 from websocket.ws_router import router as ws_router
@@ -50,6 +51,7 @@ app.include_router(alerts_router.router)
 app.include_router(status_router.router)
 app.include_router(lookup_router.router)
 app.include_router(vision_router.router)
+app.include_router(ocr.router)
 app.include_router(ws_router)
 app.include_router(recipes.router)
 app.include_router(grocery.router)

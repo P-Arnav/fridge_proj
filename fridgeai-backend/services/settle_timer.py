@@ -9,6 +9,7 @@ stable storage temperature and avoids false-positive spoilage reads.
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 
 from core.config import SETTLE_DELAY_SECONDS
 from core.database import get_db
@@ -31,7 +32,7 @@ async def _run_settle(item_id: str, delay: float) -> None:
         _pending.pop(item_id, None)
 
 
-def schedule(item_id: str, delay: float | None = None) -> None:
+def schedule(item_id: str, delay: Optional[float] = None) -> None:
     """Start a settle timer for item_id. Cancels any existing timer first."""
     cancel(item_id)
     actual_delay = delay if delay is not None else float(SETTLE_DELAY_SECONDS)

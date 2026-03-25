@@ -8,7 +8,7 @@ P_consume is a static (category, day_of_week) lookup for prototype.
 """
 
 from datetime import datetime, timezone
-
+from typing import Optional
 # [day_of_week 0=Mon … 6=Sun] → P_consume per category
 _CONSUME_PRIOR: dict[str, list[float]] = {
     "dairy":     [0.60, 0.50, 0.50, 0.50, 0.60, 0.70, 0.70],
@@ -23,7 +23,7 @@ _CONSUME_PRIOR: dict[str, list[float]] = {
 _DEFAULT_PRIOR = [0.50] * 7
 
 
-def consumption_prior(category: str, day_of_week: int | None = None) -> float:
+def consumption_prior(category: str, day_of_week: Optional[int] = None) -> float:
     if day_of_week is None:
         day_of_week = datetime.now(tz=timezone.utc).weekday()
     row = _CONSUME_PRIOR.get(category, _DEFAULT_PRIOR)
@@ -34,7 +34,7 @@ def score(
     p_spoil: float,
     cost_norm: float,
     category: str,
-    day_of_week: int | None = None,
+    day_of_week: Optional[int] = None,
 ) -> float:
     """Priority score in roughly [−0.2, 0.8]. Higher → more urgent."""
     p_consume = consumption_prior(category, day_of_week)

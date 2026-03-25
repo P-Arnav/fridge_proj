@@ -46,6 +46,15 @@ export const api = {
 
   lookupItem: (name) =>
     fetch(`${BASE}/lookup/item/${encodeURIComponent(name)}`).then(r => { if (!r.ok) throw r; return r.json() }),
+    
+  scanReceipt: (blob) => {
+    const fd = new FormData()
+    fd.append('file', blob, 'receipt.jpg')
+    return fetch(`${BASE}/ocr/scan`, { method: 'POST', body: fd })
+      .then(r => { if (!r.ok) throw r; return r.json() })
+  },
+  
+  getRecipes: () => fetch(`${BASE}/recipes`).then(r => r.json()),
 }
 
 // WebSocket singleton with auto-reconnect
