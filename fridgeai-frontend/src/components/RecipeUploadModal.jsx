@@ -35,16 +35,7 @@ export default function RecipeUploadModal({ onClose, onUploaded }) {
       }, 2000)
     } catch (err) {
       setStatus('error')
-      setErrorMsg('Failed to create recipe. Either backend endpoint is missing or mock succeeded.')
-      
-      // Since it might be a mocked frontend, let's gracefully succeed after a faux delay
-      setTimeout(() => {
-        setStatus('success')
-        setTimeout(() => {
-          onUploaded?.()
-          onClose()
-        }, 1500)
-      }, 1000)
+      setErrorMsg(err?.message || 'Failed to create recipe.')
     }
   }
 
