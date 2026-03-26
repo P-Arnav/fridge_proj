@@ -10,6 +10,8 @@ export default defineConfig({
       '/status': 'http://localhost:8000',
       '/lookup': 'http://localhost:8000',
       '/vision': 'http://localhost:8000',
+      '/recipes': 'http://localhost:8000',
+      '/ocr':     'http://localhost:8000',
       '/ws':     { target: 'ws://localhost:8000', ws: true, rewriteWsOrigin: true },
     }
   }
