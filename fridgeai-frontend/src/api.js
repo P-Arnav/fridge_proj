@@ -47,6 +47,13 @@ export const api = {
       .then(r => { if (!r.ok) throw r; return r.json() })
   },
 
+  multiScanFridge: (blobs) => {
+    const fd = new FormData()
+    blobs.forEach((blob, i) => fd.append('files', blob, `cam${i}.jpg`))
+    return fetch(`${BASE}/vision/multi-scan`, { method: 'POST', body: fd, headers: authHeader() })
+      .then(r => { if (!r.ok) throw r; return r.json() })
+  },
+
   lookupBarcode: (barcode) =>
     fetch(`${BASE}/lookup/barcode/${encodeURIComponent(barcode)}`, { headers: authHeader() }).then(r => r.json()),
 

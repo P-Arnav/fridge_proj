@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from core.database import init_db, close_db
 from core.supabase_client import init_supabase
 from services.settle_timer import recover_on_startup
-from services import auto_restock
+from services import auto_restock, periodic_scorer
 from routers import items as items_router
 from routers import alerts as alerts_router
 from routers import status as status_router
@@ -36,8 +36,10 @@ async def lifespan(app: FastAPI):
     await init_supabase()
     await recover_on_startup()
     auto_restock.start()
+    periodic_scorer.start()
     yield
     auto_restock.stop()
+    periodic_scorer.stop()
     await close_db()
 
 

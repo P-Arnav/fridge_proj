@@ -1,17 +1,18 @@
 from fastapi import APIRouter, Depends
-import asyncpg
+import aiosqlite
 
 from core.database import db_dependency
 from websocket.manager import manager
 from services.settle_timer import pending_count
-from services.periodic_scorer import _rescore_all
 
 router = APIRouter(prefix="/status", tags=["status"])
 
 
 @router.get("")
-async def get_status(conn: asyncpg.Connection = Depends(db_dependency)):
-    item_count = await conn.fetchval("SELECT COUNT(*) FROM items")
+async def get_status(db: aiosqlite.Connection = Depends(db_dependency)):
+    cur = await db.execute("SELECT COUNT(*) FROM items")
+    row = await cur.fetchone()
+    item_count = row[0]
 
     return {
         "status": "ok",
@@ -19,10 +20,3 @@ async def get_status(conn: asyncpg.Connection = Depends(db_dependency)):
         "item_count": item_count,
         "pending_timers": pending_count(),
     }
-
-
-@router.post("/rescore")
-async def trigger_rescore():
-    """Manually trigger a rescore of all scored items."""
-    await _rescore_all()
-    return {"status": "ok", "message": "Rescore triggered"}

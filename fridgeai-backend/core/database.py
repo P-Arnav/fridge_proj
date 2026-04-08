@@ -2,6 +2,7 @@ from __future__ import annotations
 import contextlib
 import os
 import logging
+from urllib.parse import urlparse, unquote
 
 import asyncpg
 from dotenv import load_dotenv
@@ -93,7 +94,15 @@ async def init_db() -> None:
             "DATABASE_URL is not set in .env — "
             "get it from Supabase: Settings > Database > Connection string (Transaction pooler)"
         )
-    _pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10, ssl="require", statement_cache_size=0)
+    parsed = urlparse(DATABASE_URL)
+    _pool = await asyncpg.create_pool(
+        host=parsed.hostname,
+        port=parsed.port or 6543,
+        user=unquote(parsed.username or ""),
+        password=unquote(parsed.password or ""),
+        database=(parsed.path or "/postgres").lstrip("/"),
+        min_size=2, max_size=10, ssl="require", statement_cache_size=0,
+    )
     logger.info("PostgreSQL pool created")
     async with _pool.acquire() as conn:
         await conn.execute(CREATE_ITEMS)

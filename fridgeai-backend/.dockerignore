@@ -1,0 +1,12 @@
+__pycache__
+*.pyc
+.env
+.env.*
+db/
+tests/
+scripts/
+.pytest_cache
+*.sqlite
+*.sqlite-journal
+.git
+env.yaml
