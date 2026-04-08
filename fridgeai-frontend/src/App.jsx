@@ -298,6 +298,15 @@ export default function App() {
             <WsIndicator status={state.wsStatus} />
             {authUser && (
               <>
+                {authUser.household_name && (
+                  <span style={{
+                    fontSize: 10, color: C.blue, background: C.blue + '18',
+                    borderRadius: 10, padding: '2px 10px',
+                    fontFamily: "'Syne', sans-serif", fontWeight: 600,
+                  }}>
+                    {authUser.household_name}
+                  </span>
+                )}
                 <InviteCodeBadge />
                 <span style={{ fontSize: 12, color: C.muted, fontFamily: "'Syne', sans-serif" }}>
                   {authUser.username}

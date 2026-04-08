@@ -21,17 +21,19 @@ class UserRead(BaseModel):
     username: str
     email: str
     household_id: str
+    household_name: str = ""
     role: str = "member"
     created_at: str
 
     @classmethod
-    def from_supabase(cls, user, household_id: str) -> "UserRead":
+    def from_supabase(cls, user, household_id: str, household_name: str = "") -> "UserRead":
         meta = user.user_metadata or {}
         return cls(
             user_id=str(user.id),
             username=meta.get("username", user.email.split("@")[0]),
             email=user.email,
             household_id=household_id,
+            household_name=household_name,
             role=meta.get("role", "member"),
             created_at=str(user.created_at),
         )
