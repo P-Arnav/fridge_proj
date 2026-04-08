@@ -24,52 +24,62 @@ async def _check_and_restock() -> None:
     from core.supabase_client import get_supabase
     from websocket.manager import manager
 
-    # Only run if at least one user has auto-restock enabled (checked in Supabase)
+    # Find all households with auto-restock enabled
     try:
         sb = get_supabase()
-        result = await sb.table("user_prefs").select("user_id").eq("auto_restock_enabled", True).execute()
+        result = await sb.table("user_prefs").select("household_id").eq("auto_restock_enabled", True).execute()
         if not result.data:
             return
     except Exception:
         return  # Supabase unavailable — skip this cycle
 
+    household_ids = list({row["household_id"] for row in result.data if row.get("household_id")})
+
     async with get_db() as conn:
-        rows = await conn.fetch("SELECT name, category, quantity, rsl, p_spoil FROM items")
-        now = datetime.now(tz=timezone.utc).isoformat()
-        added: list[str] = []
+        for household_id in household_ids:
+            await _restock_for_household(conn, household_id, manager)
 
-        for row in rows:
-            name, category, qty = row["name"], row["category"], row["quantity"]
-            rsl, p_spoil = row["rsl"], row["p_spoil"]
 
-            is_urgent = rsl is not None and rsl < 2.0 and p_spoil is not None and p_spoil > 0.5
-            is_low = qty == 1 and p_spoil is not None and p_spoil > 0.4
-            if not (is_urgent or is_low):
-                continue
+async def _restock_for_household(conn, household_id: str, manager) -> None:
+    rows = await conn.fetch(
+        "SELECT name, category, quantity, rsl, p_spoil FROM items WHERE household_id = $1",
+        household_id,
+    )
+    now = datetime.now(tz=timezone.utc).isoformat()
+    added: list[str] = []
 
-            # Skip if already in grocery list (unchecked)
-            existing = await conn.fetchrow(
-                "SELECT grocery_id FROM grocery_items WHERE LOWER(name) = LOWER($1) AND checked = 0",
-                name,
-            )
-            if existing:
-                continue
+    for row in rows:
+        name, category, qty = row["name"], row["category"], row["quantity"]
+        rsl, p_spoil = row["rsl"], row["p_spoil"]
 
-            grocery_id = str(uuid4())
-            await conn.execute(
-                "INSERT INTO grocery_items (grocery_id, name, category, quantity, checked, source, created_at) "
-                "VALUES ($1,$2,$3,1,0,'restock',$4)",
-                grocery_id, name, category, now,
-            )
-            added.append(name)
+        is_urgent = rsl is not None and rsl < 2.0 and p_spoil is not None and p_spoil > 0.5
+        is_low = qty == 1 and p_spoil is not None and p_spoil > 0.4
+        if not (is_urgent or is_low):
+            continue
 
-        if added:
-            await manager.broadcast({
-                "event": "AUTO_RESTOCK",
-                "timestamp": now,
-                "data": {"added": added, "message": f"Auto-restocked: {', '.join(added)}"},
-            })
-            logger.info("Auto-restock added %d item(s): %s", len(added), added)
+        # Skip if already in grocery list (unchecked) for this household
+        existing = await conn.fetchrow(
+            "SELECT grocery_id FROM grocery_items WHERE LOWER(name) = LOWER($1) AND checked = 0 AND household_id = $2",
+            name, household_id,
+        )
+        if existing:
+            continue
+
+        grocery_id = str(uuid4())
+        await conn.execute(
+            "INSERT INTO grocery_items (grocery_id, household_id, name, category, quantity, checked, source, created_at) "
+            "VALUES ($1,$2,$3,$4,1,0,'restock',$5)",
+            grocery_id, household_id, name, category, now,
+        )
+        added.append(name)
+
+    if added:
+        await manager.broadcast({
+            "event": "AUTO_RESTOCK",
+            "timestamp": now,
+            "data": {"added": added, "message": f"Auto-restocked: {', '.join(added)}"},
+        }, household_id=household_id)
+        logger.info("Auto-restock [%s] added %d item(s): %s", household_id, len(added), added)
 
 
 def start() -> None:

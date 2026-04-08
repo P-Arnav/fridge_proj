@@ -6,6 +6,7 @@ import asyncpg
 from pydantic import BaseModel
 
 from core.database import db_dependency
+from routers.auth import get_household_id
 
 router = APIRouter(prefix="/restock", tags=["restock"])
 
@@ -21,7 +22,10 @@ class RestockSuggestion(BaseModel):
 
 
 @router.get("", response_model=list[RestockSuggestion])
-async def get_restock_suggestions(conn: asyncpg.Connection = Depends(db_dependency)):
+async def get_restock_suggestions(
+    household_id: str = Depends(get_household_id),
+    conn: asyncpg.Connection = Depends(db_dependency),
+):
     """
     Suggest items to restock based on current pantry state:
     - Urgent: RSL < 2 days and P_spoil > 0.5 (will go bad before you can restock)
@@ -29,7 +33,8 @@ async def get_restock_suggestions(conn: asyncpg.Connection = Depends(db_dependen
     - Overdue: consumption pattern predicts item was needed >1 day ago (not already suggested)
     """
     rows = await conn.fetch(
-        "SELECT name, category, quantity, rsl, p_spoil FROM items"
+        "SELECT name, category, quantity, rsl, p_spoil FROM items WHERE household_id = $1",
+        household_id,
     )
 
     suggestions: list[RestockSuggestion] = []
@@ -70,7 +75,6 @@ async def get_restock_suggestions(conn: asyncpg.Connection = Depends(db_dependen
             seen.add(name.lower())
 
     # Check consumption history for items overdue based on buying cadence.
-    # Covers items already in inventory AND items that may have run out.
     overdue_rows = await conn.fetch(
         """
         WITH lagged AS (
@@ -87,7 +91,7 @@ async def get_restock_suggestions(conn: asyncpg.Connection = Depends(db_dependen
                     )
                 )) / 86400.0 AS interval_days
             FROM consumption_history
-            WHERE reason != 'wasted'
+            WHERE reason != 'wasted' AND household_id = $1
         ),
         aggregated AS (
             SELECT
@@ -108,7 +112,8 @@ async def get_restock_suggestions(conn: asyncpg.Connection = Depends(db_dependen
         WHERE times_consumed >= 2
           AND avg_interval_days IS NOT NULL
           AND avg_interval_days - EXTRACT(EPOCH FROM (NOW() - last_consumed)) / 86400.0 < -1.0
-        """
+        """,
+        household_id,
     )
 
     # Build a quick lookup of what's currently in the pantry

@@ -11,6 +11,7 @@ import httpx
 from pydantic import BaseModel
 
 from core.database import db_dependency
+from routers.auth import get_household_id
 from websocket.manager import manager
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
@@ -41,14 +42,18 @@ class CookRequest(BaseModel):
 
 
 @router.get("/suggestions", response_model=list[Recipe])
-async def get_recipe_suggestions(conn: asyncpg.Connection = Depends(db_dependency)):
+async def get_recipe_suggestions(
+    household_id: str = Depends(get_household_id),
+    conn: asyncpg.Connection = Depends(db_dependency),
+):
     """Return recipe suggestions based on current pantry items (via Spoonacular)."""
     rows = await conn.fetch(
         """SELECT name, MAX(COALESCE(p_spoil, 0)) AS ps
            FROM items
-           WHERE (p_spoil IS NULL OR p_spoil < 0.9)
+           WHERE household_id = $1 AND (p_spoil IS NULL OR p_spoil < 0.9)
            GROUP BY name
-           ORDER BY ps DESC"""
+           ORDER BY ps DESC""",
+        household_id,
     )
 
     if not rows:
@@ -121,6 +126,7 @@ async def get_recipe_details(meal_id: str):
 async def cook_recipe(
     meal_id: str,
     body: CookRequest,
+    household_id: str = Depends(get_household_id),
     conn: asyncpg.Connection = Depends(db_dependency),
 ):
     """Record cooking a recipe — decrements quantity of the specified pantry items by 1."""
@@ -129,37 +135,41 @@ async def cook_recipe(
 
     for item_id in body.item_ids:
         row = await conn.fetchrow(
-            "SELECT item_id, name, category, quantity FROM items WHERE item_id = $1", item_id
+            "SELECT item_id, name, category, quantity FROM items WHERE item_id = $1 AND household_id = $2",
+            item_id, household_id,
         )
         if row is None:
             continue
 
         new_qty = row["quantity"] - 1
         if new_qty <= 0:
-            await conn.execute("DELETE FROM items WHERE item_id = $1", item_id)
+            await conn.execute(
+                "DELETE FROM items WHERE item_id = $1 AND household_id = $2",
+                item_id, household_id,
+            )
             await manager.broadcast({
                 "event": "ITEM_DELETED",
                 "timestamp": now,
                 "data": {"item_id": item_id, "reason": "consumed"},
-            })
+            }, household_id=household_id)
         else:
             await conn.execute(
-                "UPDATE items SET quantity = $1, updated_at = $2 WHERE item_id = $3",
-                new_qty, now, item_id,
+                "UPDATE items SET quantity = $1, updated_at = $2 WHERE item_id = $3 AND household_id = $4",
+                new_qty, now, item_id, household_id,
             )
             await manager.broadcast({
                 "event": "ITEM_UPDATED",
                 "timestamp": now,
                 "data": {"item_id": item_id, "changed_fields": {"quantity": new_qty}},
-            })
+            }, household_id=household_id)
 
         # Record consumption history
         hist_id = str(uuid4())
         await conn.execute(
             """INSERT INTO consumption_history
-               (id, item_id, item_name, category, quantity_consumed, reason, p_spoil_at_removal, consumed_at)
-               VALUES ($1,$2,$3,$4,$5,'cooked',$6,$7)""",
-            hist_id, item_id, row["name"], row["category"], 1, None, now,
+               (id, household_id, item_id, item_name, category, quantity_consumed, reason, p_spoil_at_removal, consumed_at)
+               VALUES ($1,$2,$3,$4,$5,$6,'cooked',$7,$8)""",
+            hist_id, household_id, item_id, row["name"], row["category"], 1, None, now,
         )
         consumed.append(item_id)
 

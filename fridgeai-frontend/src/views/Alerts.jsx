@@ -1,4 +1,5 @@
 import { C, ALERT_COLOR, ALERT_LABEL } from '../constants.js'
+import { api } from '../api.js'
 
 function fmtTime(iso) {
   try {
@@ -11,24 +12,48 @@ function fmtTime(iso) {
   }
 }
 
-export default function Alerts({ alerts }) {
+export default function Alerts({ alerts, dispatch }) {
+  async function handleDismiss(alertId) {
+    dispatch({ type: 'REMOVE_ALERT', alert_id: alertId })
+    try { await api.dismissAlert(alertId) } catch { /* already removed from UI */ }
+  }
+
+  async function handleClearAll() {
+    dispatch({ type: 'CLEAR_ALERTS' })
+    try { await api.clearAllAlerts() } catch { /* already cleared from UI */ }
+  }
+
   if (alerts.length === 0) {
     return (
       <div style={{ textAlign: 'center', color: C.muted, padding: '60px 0' }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-        <div style={{ fontSize: 15 }}>No alerts yet — everything looks fresh.</div>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>OK</div>
+        <div style={{ fontSize: 15 }}>No alerts — everything looks fresh.</div>
       </div>
     )
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {alerts.map(a => <AlertRow key={a.alert_id} alert={a} />)}
+      {/* Header with clear button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <div style={{ fontSize: 12, color: C.muted, fontFamily: "'Syne', sans-serif" }}>
+          {alerts.length} active alert{alerts.length !== 1 ? 's' : ''}
+        </div>
+        <button onClick={handleClearAll} style={{
+          background: 'none', border: `1px solid ${C.border2}`, borderRadius: 7,
+          padding: '5px 12px', cursor: 'pointer', fontSize: 11, color: C.muted,
+          fontFamily: "'Syne', sans-serif",
+        }}>
+          Clear All
+        </button>
+      </div>
+
+      {alerts.map(a => <AlertRow key={a.alert_id} alert={a} onDismiss={handleDismiss} />)}
     </div>
   )
 }
 
-function AlertRow({ alert }) {
+function AlertRow({ alert, onDismiss }) {
   const color = ALERT_COLOR[alert.alert_type] ?? C.muted
   const label = ALERT_LABEL[alert.alert_type] ?? alert.alert_type
 
@@ -75,6 +100,17 @@ function AlertRow({ alert }) {
       <div style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', flexShrink: 0 }}>
         {fmtTime(alert.created_at)}
       </div>
+
+      {/* Dismiss button */}
+      <button
+        onClick={() => onDismiss(alert.alert_id)}
+        title="Dismiss alert"
+        style={{
+          background: 'none', border: 'none', color: C.muted,
+          cursor: 'pointer', fontSize: 16, padding: '0 2px', lineHeight: 1,
+          flexShrink: 0,
+        }}
+      >X</button>
     </div>
   )
 }
