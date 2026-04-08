@@ -15,7 +15,7 @@ function jsonHeaders() {
 export const api = {
   getItems: (since) =>
     fetch(since ? `${BASE}/items?updated_since=${encodeURIComponent(since)}` : `${BASE}/items`,
-      { headers: authHeader() }).then(r => r.json()),
+      { headers: authHeader() }).then(r => { if (!r.ok) throw r; return r.json() }),
 
   postItem: (body) =>
     fetch(`${BASE}/items`, {
@@ -36,7 +36,7 @@ export const api = {
 
   getAlerts: (since) =>
     fetch(since ? `${BASE}/alerts?since=${encodeURIComponent(since)}` : `${BASE}/alerts`,
-      { headers: authHeader() }).then(r => r.json()),
+      { headers: authHeader() }).then(r => { if (!r.ok) throw r; return r.json() }),
 
   dismissAlert: (alertId) =>
     fetch(`${BASE}/alerts/${encodeURIComponent(alertId)}`, { method: 'DELETE', headers: authHeader() }),
@@ -44,7 +44,7 @@ export const api = {
   clearAllAlerts: () =>
     fetch(`${BASE}/alerts`, { method: 'DELETE', headers: authHeader() }),
 
-  getStatus: () => fetch(`${BASE}/status`, { headers: authHeader() }).then(r => r.json()),
+  getStatus: () => fetch(`${BASE}/status`, { headers: authHeader() }).then(r => { if (!r.ok) throw r; return r.json() }),
 
   scanFridge: (blob) => {
     const fd = new FormData()
@@ -72,7 +72,7 @@ export const api = {
 
   // Grocery list
   getGrocery: () =>
-    fetch(`${BASE}/grocery`, { headers: authHeader() }).then(r => r.json()),
+    fetch(`${BASE}/grocery`, { headers: authHeader() }).then(r => { if (!r.ok) throw r; return r.json() }),
 
   addGrocery: (body) =>
     fetch(`${BASE}/grocery`, {
@@ -96,7 +96,7 @@ export const api = {
 
   // Restock suggestions
   getRestock: () =>
-    fetch(`${BASE}/restock`, { headers: authHeader() }).then(r => r.json()),
+    fetch(`${BASE}/restock`, { headers: authHeader() }).then(r => { if (!r.ok) throw r; return r.json() }),
 
   // Recipes
   getRecipes: () =>

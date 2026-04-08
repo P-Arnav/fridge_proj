@@ -120,14 +120,16 @@ styleEl.textContent = `
 document.head.appendChild(styleEl)
 
 function sendBrowserNotification(alert) {
-  if (Notification.permission !== 'granted') return
-  const labels = { CRITICAL_ALERT: 'CRITICAL', WARNING_ALERT: 'WARNING', USE_TODAY_ALERT: 'USE TODAY' }
-  const title = `${labels[alert.alert_type] || 'Alert'}: ${alert.item_name}`
-  new Notification(title, {
-    body: alert.message,
-    icon: '/favicon.ico',
-    tag: alert.alert_id,
-  })
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return
+    const labels = { CRITICAL_ALERT: 'CRITICAL', WARNING_ALERT: 'WARNING', USE_TODAY_ALERT: 'USE TODAY' }
+    const title = `${labels[alert.alert_type] || 'Alert'}: ${alert.item_name}`
+    new Notification(title, {
+      body: alert.message,
+      icon: '/favicon.ico',
+      tag: alert.alert_id,
+    })
+  } catch { /* notifications unavailable */ }
 }
 
 export default function App() {
