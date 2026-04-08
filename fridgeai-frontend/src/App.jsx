@@ -375,42 +375,75 @@ function SidebarBtn({ icon, label, active, badge, color, onClick }) {
 function InviteCodeBadge() {
   const [code, setCode] = useState(null)
   const [show, setShow] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [copied, setCopied] = useState(false)
 
   const fetchCode = async () => {
     if (code) { setShow(s => !s); return }
+    setLoading(true)
+    setError(null)
     try {
       const res = await api.getInviteCode()
       setCode(res.invite_code)
       setShow(true)
-    } catch { /* auth may be off */ }
+    } catch {
+      setError('Could not fetch invite code')
+      setShow(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const copyCode = () => {
+    if (!code) return
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
   }
 
   return (
     <div style={{ position: 'relative' }}>
-      <button onClick={fetchCode} title="Household invite code" style={{
+      <button onClick={fetchCode} disabled={loading} title="Household invite code" style={{
         background: 'none', border: `1px solid ${C.border2}`,
         borderRadius: 6, padding: '4px 10px', color: C.muted,
         cursor: 'pointer', fontSize: 11, fontFamily: "'Syne', sans-serif",
-      }}>Invite</button>
-      {show && code && (
+        opacity: loading ? 0.5 : 1,
+      }}>{loading ? '...' : 'Invite'}</button>
+      {show && (
         <div style={{
           position: 'absolute', top: '110%', right: 0, zIndex: 50,
           background: C.surface, border: `1px solid ${C.border2}`,
-          borderRadius: 8, padding: '10px 14px', minWidth: 180,
+          borderRadius: 8, padding: '12px 16px', minWidth: 200,
           boxShadow: '0 8px 24px #00000066',
         }}>
-          <div style={{ fontSize: 10, color: C.muted, marginBottom: 4, fontFamily: "'Syne', sans-serif", textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Invite Code
-          </div>
-          <div style={{
-            fontSize: 20, fontWeight: 800, color: C.teal, letterSpacing: '0.2em',
-            fontFamily: "'JetBrains Mono', monospace", textAlign: 'center', padding: '4px 0',
-          }}>
-            {code}
-          </div>
-          <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
-            Share this with others to join your household
-          </div>
+          {error ? (
+            <div style={{ fontSize: 12, color: C.critical }}>{error}</div>
+          ) : (
+            <>
+              <div style={{ fontSize: 10, color: C.muted, marginBottom: 6, fontFamily: "'Syne', sans-serif", textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Invite Code
+              </div>
+              <div
+                onClick={copyCode}
+                title="Click to copy"
+                style={{
+                  fontSize: 22, fontWeight: 800, color: C.teal, letterSpacing: '0.25em',
+                  fontFamily: "'JetBrains Mono', monospace", textAlign: 'center', padding: '6px 0',
+                  cursor: 'pointer', borderRadius: 6, background: C.teal + '12',
+                }}>
+                {code}
+              </div>
+              <div style={{ fontSize: 10, color: copied ? C.safe : C.muted, marginTop: 6, textAlign: 'center' }}>
+                {copied ? 'Copied!' : 'Click code to copy — share to invite others'}
+              </div>
+            </>
+          )}
+          <button onClick={() => setShow(false)} style={{
+            position: 'absolute', top: 6, right: 8, background: 'none',
+            border: 'none', color: C.muted, cursor: 'pointer', fontSize: 12,
+          }}>X</button>
         </div>
       )}
     </div>
