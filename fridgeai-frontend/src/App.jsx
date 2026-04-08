@@ -56,6 +56,12 @@ function reducer(state, action) {
     case 'REMOVE_TOAST':
       return { ...state, toasts: state.toasts.filter(t => t._toastId !== action.id) }
 
+    case 'REMOVE_ALERT':
+      return { ...state, alerts: state.alerts.filter(a => a.alert_id !== action.alert_id) }
+
+    case 'CLEAR_ALERTS':
+      return { ...state, alerts: [] }
+
     case 'ADD_GROCERY':
       return { ...state, groceryItems: [action.item, ...state.groceryItems] }
 
@@ -113,14 +119,42 @@ styleEl.textContent = `
 `
 document.head.appendChild(styleEl)
 
+function sendBrowserNotification(alert) {
+  if (Notification.permission !== 'granted') return
+  const labels = { CRITICAL_ALERT: 'CRITICAL', WARNING_ALERT: 'WARNING', USE_TODAY_ALERT: 'USE TODAY' }
+  const title = `${labels[alert.alert_type] || 'Alert'}: ${alert.item_name}`
+  new Notification(title, {
+    body: alert.message,
+    icon: '/favicon.ico',
+    tag: alert.alert_id,
+  })
+}
+
 export default function App() {
-  const [state, dispatch] = useReducer(reducer, initial)
+  const [state, rawDispatch] = useReducer(reducer, initial)
+  const dispatch = useCallback((action) => {
+    rawDispatch(action)
+    if (action.type === 'ADD_ALERT' && action.alert) {
+      sendBrowserNotification(action.alert)
+    }
+    // Also intercept WS_MESSAGE for ALERT_FIRED
+    if (action.type === 'WS_MESSAGE' && action.msg?.event === 'ALERT_FIRED') {
+      sendBrowserNotification(action.msg.data)
+    }
+  }, [])
   const toastTimers = useRef({})
   const [authUser, setAuthUser] = useState(null)
   const [requireAuth, setRequireAuth] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const [dataLoading, setDataLoading] = useState(true)
   const [animKey, setAnimKey] = useState(0)
+
+  // Request browser notification permission
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
 
   // Check auth config then validate any stored token
   useEffect(() => {
@@ -262,6 +296,7 @@ export default function App() {
             <WsIndicator status={state.wsStatus} />
             {authUser && (
               <>
+                <InviteCodeBadge />
                 <span style={{ fontSize: 12, color: C.muted, fontFamily: "'Syne', sans-serif" }}>
                   {authUser.username}
                 </span>
@@ -292,7 +327,7 @@ export default function App() {
           ) : (
             <div key={animKey} style={{ animation: 'viewIn 0.22s ease both' }}>
               {state.view === 'inventory' && <Inventory items={state.items} />}
-              {state.view === 'alerts'    && <Alerts alerts={state.alerts} />}
+              {state.view === 'alerts'    && <Alerts alerts={state.alerts} dispatch={dispatch} />}
               {state.view === 'analytics' && <Analytics items={state.items} dispatch={dispatch} groceryItems={state.groceryItems} />}
               {state.view === 'grocery'   && <GroceryList groceryItems={state.groceryItems} dispatch={dispatch} />}
               {state.view === 'recipes'   && <Recipes items={state.items} />}
@@ -332,6 +367,51 @@ function SidebarBtn({ icon, label, active, badge, color, onClick }) {
         }} />
       )}
     </button>
+  )
+}
+
+function InviteCodeBadge() {
+  const [code, setCode] = useState(null)
+  const [show, setShow] = useState(false)
+
+  const fetchCode = async () => {
+    if (code) { setShow(s => !s); return }
+    try {
+      const res = await api.getInviteCode()
+      setCode(res.invite_code)
+      setShow(true)
+    } catch { /* auth may be off */ }
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button onClick={fetchCode} title="Household invite code" style={{
+        background: 'none', border: `1px solid ${C.border2}`,
+        borderRadius: 6, padding: '4px 10px', color: C.muted,
+        cursor: 'pointer', fontSize: 11, fontFamily: "'Syne', sans-serif",
+      }}>Invite</button>
+      {show && code && (
+        <div style={{
+          position: 'absolute', top: '110%', right: 0, zIndex: 50,
+          background: C.surface, border: `1px solid ${C.border2}`,
+          borderRadius: 8, padding: '10px 14px', minWidth: 180,
+          boxShadow: '0 8px 24px #00000066',
+        }}>
+          <div style={{ fontSize: 10, color: C.muted, marginBottom: 4, fontFamily: "'Syne', sans-serif", textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Invite Code
+          </div>
+          <div style={{
+            fontSize: 20, fontWeight: 800, color: C.teal, letterSpacing: '0.2em',
+            fontFamily: "'JetBrains Mono', monospace", textAlign: 'center', padding: '4px 0',
+          }}>
+            {code}
+          </div>
+          <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
+            Share this with others to join your household
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

@@ -8,6 +8,7 @@ class UserRegister(BaseModel):
     email: str
     password: str = Field(..., min_length=6)
     household_name: Optional[str] = None
+    invite_code: Optional[str] = None  # join existing household instead of creating
 
 
 class UserLogin(BaseModel):

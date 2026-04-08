@@ -38,6 +38,12 @@ export const api = {
     fetch(since ? `${BASE}/alerts?since=${encodeURIComponent(since)}` : `${BASE}/alerts`,
       { headers: authHeader() }).then(r => r.json()),
 
+  dismissAlert: (alertId) =>
+    fetch(`${BASE}/alerts/${encodeURIComponent(alertId)}`, { method: 'DELETE', headers: authHeader() }),
+
+  clearAllAlerts: () =>
+    fetch(`${BASE}/alerts`, { method: 'DELETE', headers: authHeader() }),
+
   getStatus: () => fetch(`${BASE}/status`, { headers: authHeader() }).then(r => r.json()),
 
   scanFridge: (blob) => {
@@ -137,6 +143,10 @@ export const api = {
 
   getMe: () =>
     fetch(`${BASE}/auth/me`, { headers: authHeader() })
+      .then(r => { if (!r.ok) throw r; return r.json() }),
+
+  getInviteCode: () =>
+    fetch(`${BASE}/auth/invite-code`, { headers: authHeader() })
       .then(r => { if (!r.ok) throw r; return r.json() }),
 
   getPrefs: () =>

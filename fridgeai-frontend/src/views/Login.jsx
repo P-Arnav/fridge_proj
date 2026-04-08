@@ -3,8 +3,8 @@ import { C } from '../constants.js'
 
 export default function Login({ onAuth }) {
   const [mode, setMode] = useState('login')  // 'login' | 'register'
-  const [form, setForm] = useState({ username: '', email: '', password: '', household_name: '' })
-  // In login mode the email field doubles as the sign-in identifier
+  const [joinMode, setJoinMode] = useState('create') // 'create' | 'join'
+  const [form, setForm] = useState({ username: '', email: '', password: '', household_name: '', invite_code: '' })
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -16,9 +16,21 @@ export default function Login({ onAuth }) {
     setLoading(true)
     try {
       const url = mode === 'login' ? `${BASE}/auth/login` : `${BASE}/auth/register`
-      const body = mode === 'login'
-        ? { email: form.email, password: form.password }
-        : { username: form.username, email: form.email, password: form.password, household_name: form.household_name || undefined }
+      let body
+      if (mode === 'login') {
+        body = { email: form.email, password: form.password }
+      } else {
+        body = {
+          username: form.username,
+          email: form.email,
+          password: form.password,
+        }
+        if (joinMode === 'join' && form.invite_code.trim()) {
+          body.invite_code = form.invite_code.trim()
+        } else {
+          body.household_name = form.household_name || undefined
+        }
+      }
 
       const res = await fetch(url, {
         method: 'POST',
@@ -33,13 +45,13 @@ export default function Login({ onAuth }) {
           if (typeof detail === 'string') msg = detail
           else if (Array.isArray(detail)) msg = detail.map(e => e.msg || JSON.stringify(e)).join('; ')
           else if (detail) msg = JSON.stringify(detail)
-        } catch { /* response wasn't JSON — keep the default message */ }
+        } catch { /* response wasn't JSON */ }
         throw new Error(msg)
       }
       const data = await res.json()
       localStorage.setItem('fridge_token', data.access_token)
       localStorage.setItem('fridge_user', JSON.stringify(data.user))
-      setForm({ username: '', email: '', password: '', household_name: '' })
+      setForm({ username: '', email: '', password: '', household_name: '', invite_code: '' })
       onAuth(data.user)
     } catch (err) {
       setError(err.message)
@@ -48,13 +60,13 @@ export default function Login({ onAuth }) {
     }
   }
 
-  const inp = (field, placeholder, type = 'text') => (
+  const inp = (field, placeholder, type = 'text', required = true) => (
     <input
       type={type}
       placeholder={placeholder}
       value={form[field]}
       onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
-      required={field !== 'household_name'}
+      required={required}
       style={{
         width: '100%', boxSizing: 'border-box',
         background: C.surface2, border: `1px solid ${C.border2}`,
@@ -85,7 +97,33 @@ export default function Login({ onAuth }) {
           {mode === 'register' && inp('username', 'Username')}
           {inp('email', 'Email', 'email')}
           {inp('password', 'Password', 'password')}
-          {mode === 'register' && inp('household_name', 'Household name (optional)')}
+
+          {mode === 'register' && (
+            <>
+              {/* Create vs Join toggle */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['create', 'New Household'], ['join', 'Join Household']].map(([m, label]) => (
+                  <button key={m} type="button" onClick={() => setJoinMode(m)} style={{
+                    flex: 1,
+                    background: joinMode === m ? C.teal + '22' : 'none',
+                    border: `1px solid ${joinMode === m ? C.teal : C.border2}`,
+                    color: joinMode === m ? C.teal : C.muted,
+                    borderRadius: 8, padding: '7px 10px', cursor: 'pointer', fontSize: 12,
+                    fontFamily: "'Syne', sans-serif", fontWeight: joinMode === m ? 700 : 400,
+                  }}>{label}</button>
+                ))}
+              </div>
+
+              {joinMode === 'create' && inp('household_name', 'Household name (optional)', 'text', false)}
+              {joinMode === 'join' && inp('invite_code', 'Invite code (6 characters)', 'text', true)}
+
+              {joinMode === 'join' && (
+                <div style={{ fontSize: 11, color: C.muted, marginTop: -4 }}>
+                  Ask a household member for their invite code
+                </div>
+              )}
+            </>
+          )}
 
           {error && (
             <div style={{
@@ -106,7 +144,7 @@ export default function Login({ onAuth }) {
               opacity: loading ? 0.7 : 1, marginTop: 4,
             }}
           >
-            {loading ? '...' : mode === 'login' ? 'Sign in' : 'Create account'}
+            {loading ? '...' : mode === 'login' ? 'Sign in' : joinMode === 'join' ? 'Join & Create Account' : 'Create Account'}
           </button>
         </form>
 
@@ -115,8 +153,9 @@ export default function Login({ onAuth }) {
           <button
             onClick={() => {
               setMode(m => m === 'login' ? 'register' : 'login')
-              setForm({ username: '', email: '', password: '', household_name: '' })
+              setForm({ username: '', email: '', password: '', household_name: '', invite_code: '' })
               setError(null)
+              setJoinMode('create')
             }}
             style={{
               background: 'none', border: 'none', color: C.teal,

@@ -22,6 +22,8 @@ async def run_for_item(item_id: str) -> None:
             logger.warning("scorer: item %s not found (deleted before settle?)", item_id)
             return
 
+        household_id = row["household_id"]
+
         entry_time = datetime.fromisoformat(row["entry_time"])
         now_utc = datetime.now(tz=timezone.utc)
         elapsed_days = (now_utc - entry_time.replace(tzinfo=timezone.utc)).total_seconds() / 86400.0
@@ -29,7 +31,7 @@ async def run_for_item(item_id: str) -> None:
         category_enc = CATEGORY_ENC.get(row["category"], 4)  # default: vegetable
 
         # Apply adaptive correction learned from user feedback for this category
-        correction_days = await corrections.get_correction(conn, row["category"])
+        correction_days = await corrections.get_correction(conn, row["category"], household_id)
         effective_shelf_life = max(1, round(row["shelf_life"] + correction_days))
 
         ps, remaining = aslie.compute(
@@ -40,8 +42,11 @@ async def run_for_item(item_id: str) -> None:
             humidity=row["humidity"],
         )
 
-        # Cost normalisation across current registry
-        cost_rows = await conn.fetch("SELECT estimated_cost FROM items")
+        # Cost normalisation across current household's items
+        cost_rows = await conn.fetch(
+            "SELECT estimated_cost FROM items WHERE household_id = $1",
+            household_id,
+        )
         costs = [r["estimated_cost"] for r in cost_rows]
         min_c = min(costs) if costs else 0.0
         max_c = max(costs) if costs else 1.0
@@ -66,7 +71,7 @@ async def run_for_item(item_id: str) -> None:
                 "fapf_score": round(s, 4),
                 "paif_action": action,
             },
-        })
+        }, household_id=household_id)
 
         # Alert evaluation
         alerts: list[tuple[str, str]] = []
@@ -81,15 +86,16 @@ async def run_for_item(item_id: str) -> None:
             alert_id = str(uuid4())
             await conn.execute(
                 """INSERT INTO alerts
-                   (alert_id, item_id, item_name, alert_type, p_spoil, rsl, message, created_at)
-                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8)""",
-                alert_id, item_id, row["name"], alert_type, ps, remaining, message, now_iso,
+                   (alert_id, household_id, item_id, item_name, alert_type, p_spoil, rsl, message, created_at)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)""",
+                alert_id, household_id, item_id, row["name"], alert_type, ps, remaining, message, now_iso,
             )
 
             await manager.broadcast({
                 "event": "ALERT_FIRED",
                 "timestamp": now_iso,
                 "data": {
+                    "alert_id": alert_id,
                     "item_id": item_id,
                     "item_name": row["name"],
                     "alert_type": alert_type,
@@ -97,5 +103,5 @@ async def run_for_item(item_id: str) -> None:
                     "RSL": round(remaining, 4),
                     "message": message,
                 },
-            })
+            }, household_id=household_id)
             logger.info("Alert fired: %s for item %s (%s)", alert_type, item_id, row["name"])

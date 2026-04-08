@@ -5,6 +5,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+import hashlib
+
+from core.config import DEFAULT_HOUSEHOLD_ID
 from core.supabase_client import get_supabase
 from models.user import UserRegister, UserLogin, UserRead, TokenResponse, UserPrefs, UserPrefsUpdate
 
@@ -38,15 +41,31 @@ async def get_current_user(
     return await _user_from_token(credentials.credentials)
 
 
+async def get_household_id(
+    user: Optional[UserRead] = Depends(get_current_user),
+) -> str:
+    """Return the household_id for the current request.
+    When auth is disabled, returns DEFAULT_HOUSEHOLD_ID."""
+    if user is None:
+        return DEFAULT_HOUSEHOLD_ID
+    if not user.household_id:
+        raise HTTPException(status_code=403, detail="User has no household assigned")
+    return user.household_id
+
+
 @router.get("/config")
 async def auth_config():
     return {"require_auth": REQUIRE_AUTH}
 
 
+def _make_invite_code(household_id: str) -> str:
+    """Deterministic 6-char invite code derived from household_id."""
+    return hashlib.sha256(household_id.encode()).hexdigest()[:6].upper()
+
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(body: UserRegister):
     sb = get_supabase()
-    household_name = body.household_name or f"{body.username}'s household"
 
     try:
         resp = await sb.auth.sign_up({
@@ -66,13 +85,27 @@ async def register(body: UserRegister):
 
     user_id = str(resp.user.id)
 
-    try:
-        h_result = await sb.table("households").insert({"name": household_name}).execute()
-        household_id = h_result.data[0]["household_id"] if h_result.data else None
-        if household_id is None:
-            raise ValueError(f"Household insert returned no data: {h_result}")
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Household creation failed: {exc}")
+    if body.invite_code:
+        # Join an existing household by invite code
+        all_households = await sb.table("households").select("household_id, name").execute()
+        matched = None
+        for h in (all_households.data or []):
+            if _make_invite_code(h["household_id"]) == body.invite_code.strip().upper():
+                matched = h
+                break
+        if matched is None:
+            raise HTTPException(status_code=400, detail="Invalid invite code")
+        household_id = matched["household_id"]
+    else:
+        # Create a new household
+        household_name = body.household_name or f"{body.username}'s household"
+        try:
+            h_result = await sb.table("households").insert({"name": household_name}).execute()
+            household_id = h_result.data[0]["household_id"] if h_result.data else None
+            if household_id is None:
+                raise ValueError(f"Household insert returned no data: {h_result}")
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Household creation failed: {exc}")
 
     try:
         await sb.table("user_prefs").insert({
@@ -119,6 +152,15 @@ async def logout(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(
 @router.get("/me", response_model=UserRead)
 async def get_me(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
     return await _user_from_token(credentials.credentials)
+
+
+@router.get("/invite-code")
+async def get_invite_code(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    user = await _user_from_token(credentials.credentials)
+    if not user.household_id:
+        raise HTTPException(status_code=400, detail="No household assigned")
+    code = _make_invite_code(user.household_id)
+    return {"invite_code": code, "household_id": user.household_id}
 
 
 @router.get("/prefs", response_model=UserPrefs)

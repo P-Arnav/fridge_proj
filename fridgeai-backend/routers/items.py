@@ -9,6 +9,7 @@ import asyncpg
 from core.database import db_dependency
 from models.item import ItemCreate, ItemRead, ItemUpdate
 from models.feedback import FeedbackCreate, FeedbackRead
+from routers.auth import get_household_id
 from services import settle_timer
 from websocket.manager import manager
 
@@ -19,7 +20,11 @@ _SCORE_FIELDS = {"shelf_life", "storage_temp", "humidity"}
 
 
 @router.post("", response_model=ItemRead, status_code=status.HTTP_201_CREATED)
-async def create_item(body: ItemCreate, conn: asyncpg.Connection = Depends(db_dependency)):
+async def create_item(
+    body: ItemCreate,
+    household_id: str = Depends(get_household_id),
+    conn: asyncpg.Connection = Depends(db_dependency),
+):
     if not body.name or not body.name.strip():
         raise HTTPException(status_code=400, detail="Item name cannot be empty")
     if body.quantity <= 0:
@@ -34,11 +39,11 @@ async def create_item(body: ItemCreate, conn: asyncpg.Connection = Depends(db_de
 
     await conn.execute(
         """INSERT INTO items
-           (item_id, name, category, quantity, entry_time, shelf_life,
+           (item_id, household_id, name, category, quantity, entry_time, shelf_life,
             location, estimated_cost, storage_temp, humidity,
             confidence_tier, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'LOW',$11)""",
-        item_id, body.name, body.category, body.quantity, now,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'LOW',$12)""",
+        item_id, household_id, body.name, body.category, body.quantity, now,
         body.shelf_life, body.location, body.estimated_cost,
         body.storage_temp, body.humidity, now,
     )
@@ -52,7 +57,7 @@ async def create_item(body: ItemCreate, conn: asyncpg.Connection = Depends(db_de
         "event": "ITEM_INSERTED",
         "timestamp": now,
         "data": item.model_dump(),
-    })
+    }, household_id=household_id)
 
     return item
 
@@ -61,10 +66,11 @@ async def create_item(body: ItemCreate, conn: asyncpg.Connection = Depends(db_de
 async def list_items(
     category: Optional[str] = None,
     updated_since: Optional[str] = None,
+    household_id: str = Depends(get_household_id),
     conn: asyncpg.Connection = Depends(db_dependency),
 ):
-    query = "SELECT * FROM items WHERE 1=1"
-    params: list = []
+    query = "SELECT * FROM items WHERE household_id = $1"
+    params: list = [household_id]
 
     if category:
         params.append(category)
@@ -78,8 +84,15 @@ async def list_items(
 
 
 @router.get("/{item_id}", response_model=ItemRead)
-async def get_item(item_id: str, conn: asyncpg.Connection = Depends(db_dependency)):
-    row = await conn.fetchrow("SELECT * FROM items WHERE item_id = $1", item_id)
+async def get_item(
+    item_id: str,
+    household_id: str = Depends(get_household_id),
+    conn: asyncpg.Connection = Depends(db_dependency),
+):
+    row = await conn.fetchrow(
+        "SELECT * FROM items WHERE item_id = $1 AND household_id = $2",
+        item_id, household_id,
+    )
     if row is None:
         raise HTTPException(status_code=404, detail="Item not found")
     return ItemRead.from_row(row)
@@ -89,9 +102,13 @@ async def get_item(item_id: str, conn: asyncpg.Connection = Depends(db_dependenc
 async def update_item(
     item_id: str,
     body: ItemUpdate,
+    household_id: str = Depends(get_household_id),
     conn: asyncpg.Connection = Depends(db_dependency),
 ):
-    existing = await conn.fetchrow("SELECT item_id FROM items WHERE item_id = $1", item_id)
+    existing = await conn.fetchrow(
+        "SELECT item_id FROM items WHERE item_id = $1 AND household_id = $2",
+        item_id, household_id,
+    )
     if existing is None:
         raise HTTPException(status_code=404, detail="Item not found")
 
@@ -106,8 +123,8 @@ async def update_item(
     vals = list(updates.values())
     set_clause = ", ".join(f"{k} = ${i+1}" for i, k in enumerate(keys))
     await conn.execute(
-        f"UPDATE items SET {set_clause} WHERE item_id = ${len(keys)+1}",
-        *vals, item_id,
+        f"UPDATE items SET {set_clause} WHERE item_id = ${len(keys)+1} AND household_id = ${len(keys)+2}",
+        *vals, item_id, household_id,
     )
 
     # Rescore if any score-relevant field changed
@@ -121,7 +138,7 @@ async def update_item(
         "event": "ITEM_UPDATED",
         "timestamp": now,
         "data": {"item_id": item_id, "changed_fields": body.model_dump(exclude_none=True)},
-    })
+    }, household_id=household_id)
 
     return item
 
@@ -130,9 +147,13 @@ async def update_item(
 async def submit_feedback(
     item_id: str,
     body: FeedbackCreate,
+    household_id: str = Depends(get_household_id),
     conn: asyncpg.Connection = Depends(db_dependency),
 ):
-    row = await conn.fetchrow("SELECT * FROM items WHERE item_id = $1", item_id)
+    row = await conn.fetchrow(
+        "SELECT * FROM items WHERE item_id = $1 AND household_id = $2",
+        item_id, household_id,
+    )
     if row is None:
         raise HTTPException(status_code=404, detail="Item not found")
 
@@ -152,9 +173,9 @@ async def submit_feedback(
     now = datetime.now(tz=timezone.utc).isoformat()
     await conn.execute(
         """INSERT INTO feedback
-           (feedback_id, item_id, category, shelf_life_declared, shelf_life_actual, correction, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7)""",
-        feedback_id, item_id, row["category"], declared, actual, correction, now,
+           (feedback_id, household_id, item_id, category, shelf_life_declared, shelf_life_actual, correction, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)""",
+        feedback_id, household_id, item_id, row["category"], declared, actual, correction, now,
     )
 
     # Rescore item immediately with the updated correction applied
@@ -175,9 +196,13 @@ async def submit_feedback(
 async def delete_item(
     item_id: str,
     reason: str = "consumed",
+    household_id: str = Depends(get_household_id),
     conn: asyncpg.Connection = Depends(db_dependency),
 ):
-    row = await conn.fetchrow("SELECT * FROM items WHERE item_id = $1", item_id)
+    row = await conn.fetchrow(
+        "SELECT * FROM items WHERE item_id = $1 AND household_id = $2",
+        item_id, household_id,
+    )
     if row is None:
         raise HTTPException(status_code=404, detail="Item not found")
 
@@ -193,16 +218,19 @@ async def delete_item(
     now = datetime.now(tz=timezone.utc).isoformat()
     await conn.execute(
         """INSERT INTO consumption_history
-           (id, item_id, item_name, category, quantity_consumed, reason, p_spoil_at_removal, consumed_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)""",
-        hist_id, item_id, row["name"], row["category"], row["quantity"],
+           (id, household_id, item_id, item_name, category, quantity_consumed, reason, p_spoil_at_removal, consumed_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)""",
+        hist_id, household_id, item_id, row["name"], row["category"], row["quantity"],
         effective_reason, row["p_spoil"], now,
     )
 
-    await conn.execute("DELETE FROM items WHERE item_id = $1", item_id)
+    await conn.execute(
+        "DELETE FROM items WHERE item_id = $1 AND household_id = $2",
+        item_id, household_id,
+    )
 
     await manager.broadcast({
         "event": "ITEM_DELETED",
         "timestamp": now,
         "data": {"item_id": item_id, "reason": reason},
-    })
+    }, household_id=household_id)

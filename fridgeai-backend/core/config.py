@@ -34,6 +34,9 @@ CATEGORY_ENC: dict[str, int] = {
     "fruit": 5, "fish": 6, "cooked": 7, "beverage": 8,
 }
 
+# Default household for when auth is disabled
+DEFAULT_HOUSEHOLD_ID: str = "__default__"
+
 # Alert thresholds
 ALERT_CRITICAL:  float = 0.80
 ALERT_WARNING:   float = 0.50

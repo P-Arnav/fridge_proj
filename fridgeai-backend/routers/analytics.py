@@ -7,6 +7,7 @@ import asyncpg
 from pydantic import BaseModel
 
 from core.database import db_dependency
+from routers.auth import get_household_id
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -35,6 +36,7 @@ class WasteSummary(BaseModel):
 @router.get("/consumption", response_model=list[ConsumptionPoint])
 async def consumption_trend(
     days: int = 30,
+    household_id: str = Depends(get_household_id),
     conn: asyncpg.Connection = Depends(db_dependency),
 ):
     """Daily consumption counts for the last N days."""
@@ -44,12 +46,13 @@ async def consumption_trend(
                COUNT(*) as items_consumed,
                SUM(quantity_consumed) as total_quantity
         FROM consumption_history
-        WHERE consumed_at::timestamp >= NOW() - ($1 || ' days')::interval
+        WHERE household_id = $1
+          AND consumed_at::timestamp >= NOW() - ($2 || ' days')::interval
           AND reason != 'wasted'
         GROUP BY DATE(consumed_at::timestamp)
         ORDER BY date ASC
         """,
-        str(days),
+        household_id, str(days),
     )
     return [
         ConsumptionPoint(
@@ -62,7 +65,10 @@ async def consumption_trend(
 
 
 @router.get("/waste-patterns", response_model=list[WastePattern])
-async def waste_patterns(conn: asyncpg.Connection = Depends(db_dependency)):
+async def waste_patterns(
+    household_id: str = Depends(get_household_id),
+    conn: asyncpg.Connection = Depends(db_dependency),
+):
     """Items most frequently wasted/expired."""
     rows = await conn.fetch(
         """
@@ -70,11 +76,12 @@ async def waste_patterns(conn: asyncpg.Connection = Depends(db_dependency)):
                COUNT(*) as times_wasted,
                AVG(p_spoil_at_removal) as avg_p_spoil
         FROM consumption_history
-        WHERE reason = 'wasted'
+        WHERE reason = 'wasted' AND household_id = $1
         GROUP BY LOWER(item_name), category
         ORDER BY times_wasted DESC
         LIMIT 20
-        """
+        """,
+        household_id,
     )
     return [
         WastePattern(
@@ -88,16 +95,21 @@ async def waste_patterns(conn: asyncpg.Connection = Depends(db_dependency)):
 
 
 @router.get("/summary", response_model=WasteSummary)
-async def waste_summary(days: int = 30, conn: asyncpg.Connection = Depends(db_dependency)):
+async def waste_summary(
+    days: int = 30,
+    household_id: str = Depends(get_household_id),
+    conn: asyncpg.Connection = Depends(db_dependency),
+):
     row = await conn.fetchrow(
         """
         SELECT
             SUM(CASE WHEN reason != 'wasted' THEN 1 ELSE 0 END) as consumed,
             SUM(CASE WHEN reason  = 'wasted' THEN 1 ELSE 0 END) as wasted
         FROM consumption_history
-        WHERE consumed_at::timestamp >= NOW() - ($1 || ' days')::interval
+        WHERE household_id = $1
+          AND consumed_at::timestamp >= NOW() - ($2 || ' days')::interval
         """,
-        str(days),
+        household_id, str(days),
     )
     consumed = row["consumed"] or 0
     wasted = row["wasted"] or 0
@@ -112,9 +124,10 @@ async def waste_summary(days: int = 30, conn: asyncpg.Connection = Depends(db_de
         for r in await conn.fetch(
             """
             SELECT item_name, category, COUNT(*) as times_wasted, AVG(p_spoil_at_removal) as avg_p_spoil
-            FROM consumption_history WHERE reason = 'wasted'
+            FROM consumption_history WHERE reason = 'wasted' AND household_id = $1
             GROUP BY LOWER(item_name), category ORDER BY times_wasted DESC LIMIT 5
-            """
+            """,
+            household_id,
         )
     ]
 
@@ -124,10 +137,11 @@ async def waste_summary(days: int = 30, conn: asyncpg.Connection = Depends(db_de
             """
             SELECT DATE(consumed_at::timestamp) as date, COUNT(*) as items_consumed, SUM(quantity_consumed) as total_quantity
             FROM consumption_history
-            WHERE consumed_at::timestamp >= NOW() - ($1 || ' days')::interval AND reason != 'wasted'
+            WHERE household_id = $1
+              AND consumed_at::timestamp >= NOW() - ($2 || ' days')::interval AND reason != 'wasted'
             GROUP BY DATE(consumed_at::timestamp) ORDER BY date ASC
             """,
-            str(days),
+            household_id, str(days),
         )
     ]
 
@@ -153,7 +167,10 @@ class ConsumptionPrediction(BaseModel):
 
 
 @router.get("/predictions", response_model=list[ConsumptionPrediction])
-async def consumption_predictions(conn: asyncpg.Connection = Depends(db_dependency)):
+async def consumption_predictions(
+    household_id: str = Depends(get_household_id),
+    conn: asyncpg.Connection = Depends(db_dependency),
+):
     """
     Per-item consumption behaviour model.
     Uses average inter-consumption interval to predict next consumption date.
@@ -175,7 +192,7 @@ async def consumption_predictions(conn: asyncpg.Connection = Depends(db_dependen
                     )
                 )) / 86400.0 AS interval_days
             FROM consumption_history
-            WHERE reason != 'wasted'
+            WHERE reason != 'wasted' AND household_id = $1
         )
         SELECT
             LOWER(item_name)        AS item_key,
@@ -189,7 +206,8 @@ async def consumption_predictions(conn: asyncpg.Connection = Depends(db_dependen
         FROM intervals
         GROUP BY LOWER(item_name)
         ORDER BY times_consumed DESC, last_consumed DESC
-        """
+        """,
+        household_id,
     )
 
     now = datetime.now(tz=timezone.utc)
