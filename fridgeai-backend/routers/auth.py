@@ -27,7 +27,11 @@ async def _user_from_token(token: str) -> UserRead:
     user_id = str(resp.user.id)
     prefs = await sb.table("user_prefs").select("household_id").eq("user_id", user_id).execute()
     household_id = prefs.data[0]["household_id"] if prefs.data else ""
-    return UserRead.from_supabase(resp.user, household_id)
+    household_name = ""
+    if household_id:
+        h = await sb.table("households").select("name").eq("household_id", household_id).execute()
+        household_name = h.data[0]["name"] if h.data else ""
+    return UserRead.from_supabase(resp.user, household_id, household_name)
 
 
 async def get_current_user(
@@ -96,6 +100,7 @@ async def register(body: UserRegister):
         if matched is None:
             raise HTTPException(status_code=400, detail="Invalid invite code")
         household_id = matched["household_id"]
+        household_name = matched["name"]
     else:
         # Create a new household
         household_name = body.household_name or f"{body.username}'s household"
@@ -117,7 +122,7 @@ async def register(body: UserRegister):
         raise HTTPException(status_code=500, detail=f"User prefs creation failed: {exc}")
 
     token = resp.session.access_token if resp.session else ""
-    user = UserRead.from_supabase(resp.user, household_id)
+    user = UserRead.from_supabase(resp.user, household_id, household_name)
     return TokenResponse(access_token=token, user=user)
 
 
@@ -135,8 +140,12 @@ async def login(body: UserLogin):
     user_id = str(resp.user.id)
     prefs = await sb.table("user_prefs").select("household_id").eq("user_id", user_id).execute()
     household_id = prefs.data[0]["household_id"] if prefs.data else ""
+    household_name = ""
+    if household_id:
+        h = await sb.table("households").select("name").eq("household_id", household_id).execute()
+        household_name = h.data[0]["name"] if h.data else ""
 
-    user = UserRead.from_supabase(resp.user, household_id)
+    user = UserRead.from_supabase(resp.user, household_id, household_name)
     return TokenResponse(access_token=resp.session.access_token, user=user)
 
 
