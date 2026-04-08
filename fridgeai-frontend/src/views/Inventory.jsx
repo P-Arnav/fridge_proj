@@ -3,12 +3,14 @@ import { C, CATEGORIES, CAT_COLOR, riskColor } from '../constants.js'
 import ItemCard from '../components/ItemCard.jsx'
 import AddItemModal from '../components/AddItemModal.jsx'
 import ScanModal from '../components/ScanModal.jsx'
+import MultiScanModal from '../components/MultiScanModal.jsx'
 import ReceiptModal from '../components/ReceiptModal.jsx'
 
 export default function Inventory({ items }) {
   const [filter, setFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
   const [showScan, setShowScan] = useState(false)
+  const [showMultiScan, setShowMultiScan] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
 
   const scored = items.filter(i => i.P_spoil != null)
@@ -109,6 +111,7 @@ export default function Inventory({ items }) {
           <div style={{ display: 'flex', gap: 8 }}>
             <ActionBtn onClick={() => setShowReceipt(true)} secondary>Upload Receipt</ActionBtn>
             <ActionBtn onClick={() => setShowScan(true)} outline>Scan Fridge</ActionBtn>
+            <ActionBtn onClick={() => setShowMultiScan(true)} outline>Multi-Cam</ActionBtn>
             <ActionBtn onClick={() => setShowModal(true)} primary>+ Add Item</ActionBtn>
           </div>
         </div>
@@ -139,6 +142,7 @@ export default function Inventory({ items }) {
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 20 }}>
                 <ActionBtn onClick={() => setShowReceipt(true)} secondary>Upload Receipt</ActionBtn>
                 <ActionBtn onClick={() => setShowScan(true)} outline>Scan Fridge</ActionBtn>
+                <ActionBtn onClick={() => setShowMultiScan(true)} outline>Multi-Cam</ActionBtn>
                 <ActionBtn onClick={() => setShowModal(true)} primary>+ Add Item</ActionBtn>
               </div>
             )}
@@ -148,9 +152,10 @@ export default function Inventory({ items }) {
         )}
       </div>
 
-      {showModal   && <AddItemModal   onClose={() => setShowModal(false)} />}
-      {showScan    && <ScanModal      onClose={() => setShowScan(false)} />}
-      {showReceipt && <ReceiptModal   onClose={() => setShowReceipt(false)} />}
+      {showModal     && <AddItemModal     onClose={() => setShowModal(false)} />}
+      {showScan      && <ScanModal        onClose={() => setShowScan(false)} />}
+      {showMultiScan && <MultiScanModal   onClose={() => setShowMultiScan(false)} />}
+      {showReceipt   && <ReceiptModal     onClose={() => setShowReceipt(false)} />}
     </div>
   )
 }
